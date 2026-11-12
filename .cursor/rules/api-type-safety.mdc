@@ -1,0 +1,38 @@
+---
+description: DTOs and VOs, the error envelope, no Any on signatures, and request_id as a string path. Success bodies follow the design.
+globs: app/**/*.py,tests/**/*.py
+alwaysApply: false
+---
+
+# Types and HTTP shape
+
+Field behavior is in the design document. Layering is in `architecture-constitution.mdc`. This file only sets types and response shape.
+
+## Responses
+
+A success body is the model from the design. It is not wrapped in `ApiResponse`. Errors are written only by the exception handler:
+
+```json
+{"error": "ErrorType", "message": "What went wrong"}
+```
+
+A `409` also includes `request_id`. The Router returns the model the Service already built. It does not construct a VO, and it does not `model_dump` and then change fields.
+
+## Signatures
+
+Public signatures do not use `Any`, `dict[str, Any]`, or `list[Any]`. At the boundary, `details` is `dict[str, str] | None`. Third-party JSON is first bound as `object`, then narrowed before it leaves the function.
+
+| Place | Use |
+|---|---|
+| HTTP input | DTO |
+| HTTP output | VO |
+| Repository writes | DTO or a named `TypedDict` |
+| Conditional update result | A named result, such as the number of rows changed |
+
+A DTO is input only. A VO is output only. Build a VO with `model_validate` in `prepare_` / `persist_`, not in the Router. `model_config` is only `ConfigDict(...)`.
+
+Timestamps on a VO serialize as UTC ISO 8601 with a `Z` suffix. The model columns stay text.
+
+## Paths
+
+`request_id` is a string. The path is `/{request_id}`, not `/{request_id:int}`. On one `APIRouter`, declare every static path before a parameter path.

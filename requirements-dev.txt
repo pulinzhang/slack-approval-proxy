@@ -1,0 +1,6 @@
+# Pin checkers to the versions that already pass locally. Do not use >= here.
+ruff==0.5.0
+mypy==1.8.0
+pytest==8.0.0
+pytest-asyncio==0.23.8
+pre-commit>=3.7.0

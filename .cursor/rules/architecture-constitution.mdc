@@ -1,0 +1,68 @@
+---
+description: Layering and vertical slices. The orchestrator only sequences three steps; see orchestrator-constitution.mdc.
+alwaysApply: true
+---
+
+# Layering and vertical slices
+
+The behavior contract is `doc/slack_approval_proxy_mvp_technical_design_document.md`. This file only decides who may call whom, and where code lives. Identifiers are in `naming-convention.mdc`. JSON shape is in `api-type-safety.mdc`. `main.py` is in `main-structure.mdc`. Stale paths from search are in `path-map.mdc`.
+
+## Layers
+
+```
+Request:  Router ──► Service ──► Orchestrator ──► prepare / run / persist ──► Repository ──► SQLite
+Response: SQLite ──► Repository ──► persist ──► Service ──► Router
+```
+
+| Layer | Does | Does not |
+|---|---|---|
+| **Router** | Read parameters, apply auth dependencies, call Service, return the Service model with the status code from the design | Business decisions, SQL, Slack calls, hand-built error JSON |
+| **Service** | Facade. Call Orchestrator `execute` and hand the result to the Router | SQL, `HTTPException`, unfolding the three steps in the facade |
+| **Repository** | Read and write this table, including conditional updates | `commit`, deciding whether a business action is allowed |
+| **Model** | `approval_requests` table shape | Business methods, `to_dict` |
+| **Schema** | Input DTOs and output models | Workflow |
+
+`execute` does not commit. Create's `prepare_` commits the `posting` row first, then `run_` calls Slack. `prepare_` / `run_` / `persist_` raise typed exceptions. One exception handler writes the design envelope `{"error","message"}`. Status codes are only those in the design: 401, 422, 400, 404, 409, 502, 503. Success bodies use the design's `result` and approval `status`. Orchestrator length and the three steps are in `orchestrator-constitution.mdc`.
+
+## Vertical slices
+
+```
+app/
+├── bootstrap/                         # Wiring. Lifespan creates tables and starts the minute scan
+├── common/                            # Settings, clock, constant-time compare. No slice imports
+├── routers/approvals.py               # POST/GET /api/v1/approvals
+├── routers/slack.py                   # POST /api/v1/slack/interactive
+├── routers/message_exchanges.py       # GET list, summary, and one exchange
+├── services/approval/service.py       # Facade. Only calls execute
+├── services/approval/create/          # CreateApprovalOrchestrator
+├── services/approval/decision/        # DecisionOrchestrator
+├── services/approval/scan/            # ScanOrchestrator
+├── services/approval/callback/        # CallbackOrchestrator
+├── services/slack/service.py          # Signature, Block Kit, Web API
+├── services/message_trace/service.py  # Exchange, HTTP call log, business audit, purge
+├── repositories/approval/repository.py
+├── repositories/message_trace/repository.py
+├── models/approval/
+├── models/message_trace/
+└── schemas/dto|vo/
+```
+
+- `approval` owns the approval row. Idempotency, decision, scan, and callback each have one Orchestrator. Their `prepare_` / `persist_` write the row.
+- `slack` only adapts Slack. It does not read or write `approval_requests` and does not call `approval`. It records exchanges through `message_trace`.
+- `message_trace` owns `message_exchanges`, `http_call_logs`, and `business_audit_logs`. It does not call `approval` or `slack`.
+- `static/` is the control tower. It only displays the trace reads. Bootstrap serves `static/index.html` at `GET /` and mounts the directory at `/static`. It is not a Router and it does not write trace rows. The screen contract is `doc/integration_control_tower_frontend.md`.
+- A slice `__init__.py` is only a package marker. It does not re-export. Callers import the module.
+- `main.py` only creates the app and attaches the lifespan. The scan, the per-`request_id` lock, and the callback runner all live in this one process.
+
+| Caller | May call | May not call |
+|---|---|---|
+| `routers/approvals.py` | `approval` Service; `message_trace` Service for `GET .../trace` | Repository, Model, Slack HTTP |
+| `routers/message_exchanges.py` | `message_trace` Service | Repository, `approval`, `slack` |
+| `routers/slack.py` | `slack` to verify and parse; `approval` Service to change status | Web API, Repository |
+| `approval` Service | `execute` on the four Orchestrators | Repository, Slack HTTP, Router |
+| `prepare_` / `run_` / `persist_` | This slice's Repository, `slack` Service, `message_trace` Service | Router; putting `for` or `commit` back into `execute` |
+| `slack` Service | Slack Web API, `common`, `message_trace` Service | `approval` Repository, `approval` Service |
+| `message_trace` Service | `message_trace` Repository | `approval`, `slack`, Router |
+| Exception handler | `message_trace` Service, for a rejected call that never entered a slice | Approval transitions |
+| Repository | This slice's Model, `common` | Service, Router |
+| `bootstrap` | `approval` table creation, scan startup, and serving `static/` | Business branches |

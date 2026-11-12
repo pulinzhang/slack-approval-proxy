@@ -1,0 +1,20 @@
+---
+description: Paths follow the architecture constitution. Do not create a stale *_service.py or crud.py from search results.
+alwaysApply: true
+---
+
+# Path map
+
+Directory shape is in `architecture-constitution.mdc`. This file only blocks stale search hits.
+
+If Read cannot open a path, that file is not there. Do not import it, create it, or copy it as a neighbor because an index listed it.
+
+| Search may show | This service |
+|---|---|
+| `{slice}/{slice}_service.py` | `{slice}/service.py` |
+| `export_service.py`, `{slice}_export_service.py` | Unused. Orchestration is `{duty}/orchestrator.py` |
+| A single-purpose `{feature}/crud.py` | `routers/{feature}.py` |
+| `services/approval/scanner.py`, `callback.py` | `services/approval/scan/`, `services/approval/callback/` |
+| `app/static/trace/` | `static/`. Screens are `doc/integration_control_tower_frontend.md` |
+
+Read the current file before copying a neighbor. If a neighbor returns an anonymous tuple or hand-built JSON, follow `api-type-safety.mdc` instead of copying it.

@@ -1,0 +1,24 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: ruff (lint + auto-fix)
+        entry: python -m ruff check --fix --exit-non-zero-on-fix --no-cache
+        language: system
+        types_or: [python, pyi]
+
+      - id: ruff-format
+        name: ruff (code formatter)
+        entry: python -m ruff format --no-cache
+        language: system
+        types_or: [python, pyi]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (strict type check)
+        entry: python -m mypy
+        language: system
+        types: [python]
+        args: [--config-file=pyproject.toml, app]
+        pass_filenames: false

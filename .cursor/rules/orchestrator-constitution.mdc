@@ -1,0 +1,33 @@
+---
+description: An Orchestrator only sequences work. execute stays within 20 lines and is prepare, then run, then persist.
+alwaysApply: true
+---
+
+# Orchestrator
+
+An orchestrator conducts. It does not perform the work. Who may call whom is in `architecture-constitution.mdc`. Status transitions are in `doc/slack_approval_proxy_mvp_technical_design_document.md`.
+
+## Main method
+
+Each use case is one class whose name ends with `Orchestrator`. The main method is only `execute`. It stays within 20 lines and only does these three steps:
+
+```text
+ctx = prepare_...(...)
+outcome = run_...(ctx)
+return persist_...(ctx, outcome)
+```
+
+`execute` contains no `for`, no Repository call, no `commit`, no Slack call, and no POST to `callback_url`. Retry delays and multi-row work live in `run_` or in a stage function it calls. `prepare_` and `persist_` commit.
+
+## The four conductors
+
+| Class | File | `run_` |
+|---|---|---|
+| `CreateApprovalOrchestrator` | `services/approval/create/orchestrator.py` | Post the card, or reconcile as the design describes |
+| `DecisionOrchestrator` | `services/approval/decision/orchestrator.py` | Choose approve, reject, expire, repair, or ignore |
+| `ScanOrchestrator` | `services/approval/scan/orchestrator.py` | Run the scan steps in the design's order, including exchange timeout and trace purge |
+| `CallbackOrchestrator` | `services/approval/callback/orchestrator.py` | Send once, then retry after 2s, 5s, and 10s |
+
+`prepare_`, `run_`, and `persist_` live in the same duty directory. `orchestrator.py` is a module. Do not add `orchestrator/__init__.py` to re-export the class. Callers import that module.
+
+Routers do not call an Orchestrator. The `approval` Service facade only calls `execute`.

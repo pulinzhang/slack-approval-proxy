@@ -1,0 +1,69 @@
+---
+description: Identifier names (English, underscores, and this service's domain words). Not layering or HTTP shape.
+alwaysApply: true
+---
+
+# Naming
+
+This file only decides names. Who may call whom is in `architecture-constitution.mdc`. JSON shape is in `api-type-safety.mdc`.
+
+## Rules
+
+- Use English words or a common abbreviation that says what the value is.
+- Do not use Chinese pinyin or empty names (`tmp1`, `flag1`, `data`).
+- Request and response fields are lowercase with underscores, and they match the JSON keys in the design.
+
+```
+✅ request_id, decided_by, expires_at
+❌ requestId, approvalNo, shenpi
+```
+
+## Python
+
+| Kind | Form | Example |
+|---|---|---|
+| Variable | lower_snake | `slack_message_ts` |
+| Constant | UPPER_SNAKE | `SIGNATURE_MAX_SKEW_SECONDS` |
+| Boolean | `is_` / `has_` / `can_` | `is_past_due` |
+| Private | leading underscore | `_lock` |
+| Function | lower_snake; private `_foo`; async `async_foo` | `prepare_create` |
+| Class | PascalCase; exceptions end with `Error`; orchestrators end with `Orchestrator` | `CreateApprovalOrchestrator` |
+| Module | lower_snake; tests are `test_{module}.py` | `orchestrator.py` |
+
+Where a file lives is in `architecture-constitution.mdc`. Stale paths from search are in `path-map.mdc`.
+
+## Domain words
+
+| Meaning | Name |
+|---|---|
+| Idempotency key | `request_id` |
+| Trace chain | `correlation_id` |
+| One exchange | `exchange_id` |
+| Calling system | `system_source` |
+| Outbound URL | `callback_url` |
+| Title / extra fields | `title` / `details` |
+| Approval state | `status` |
+| Operation outcome | `result` |
+| Slack channel / message | `slack_channel_id` / `slack_message_ts` |
+| Decider / decision time | `decided_by` / `decided_at` |
+| Deadline / creation | `expires_at` / `created_at` |
+| Callback delivery | `callback_state` / `callback_delivered_at` / `callback_error_log` |
+| Card matches the row | `card_updated_at` |
+| Timeout in minutes | `timeout_minutes` |
+| Message exchange | `direction` / `source_system` / `target_system` / `operation` / `http_method` / `url` / `request_headers` / `request_body` / `response_headers` / `response_body` / `exchange_status` / `business_outcome` / `sent_at` / `received_at` / `duration_ms` |
+| HTTP call log | `called_at` / `http_status` |
+| Business audit | `from_status` / `to_status` / `actor` / `reason` |
+
+`status` is only `posting`, `pending`, `approved`, `rejected`, `expired`, or `failed`. `result` is only `created` or `already_decided`. `callback_state` is only `pending`, `delivered`, or `exhausted`.
+
+## Abbreviations
+
+Allowed: `no` / `num`, `id`, `config`, `max` / `min`, `msg`, `ts`.  
+Not allowed: `cnt` for `count`, `tbl` for `table`, `val` for `value`, `str` for `string`, `int` for `integer`.
+
+| Incorrect | Correct |
+|---|---|
+| `requestId` | `request_id` |
+| `GetApproval` | `get_approval` |
+| `APPROVALREQUEST` | `ApprovalRequest` |
+| `BaseRepo` | `BaseRepository` |

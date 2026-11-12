@@ -1,0 +1,14 @@
+---
+description: Windows PowerShell and Python UTF-8 execution (scripts, installs, and logs)
+alwaysApply: true
+---
+
+# Python execution and the terminal
+
+- Run Python as UTF-8: `python -X utf8 script.py`, or set `PYTHONUTF8=1`.
+- This machine is Windows PowerShell. Do not use `&&` or `||`. Chain commands with `;` or run them separately.
+- Do not use `head`, `tail`, `grep`, or `cat`. Search text with `Select-String` or Python.
+- Correct: `python -X utf8 script.py 2>&1`
+- Incorrect: `python script.py -X utf8` (`-X` belongs immediately after the interpreter)
+
+Identifiers are in `naming-convention.mdc`. Layering is in `architecture-constitution.mdc`.

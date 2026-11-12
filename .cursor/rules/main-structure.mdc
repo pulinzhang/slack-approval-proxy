@@ -1,0 +1,24 @@
+---
+description: main.py only wires the app. Table creation, the scan, and router mounting live in bootstrap.
+globs: main.py,app/bootstrap/**/*.py
+alwaysApply: false
+---
+
+# main.py
+
+`main.py` only wires the application. It does not implement behavior. Who may call whom is in `architecture-constitution.mdc`.
+
+## Allowed here
+
+- Create the FastAPI app and attach the lifespan
+- Call bootstrap to register exception handlers, mount the `approvals`, `slack`, and `message_exchanges` routers, serve `static/index.html` at `GET /`, and mount that directory at `/static`
+- On lifespan startup, create tables and start the minute scan. On shutdown, stop the scan
+- Inside `if __name__ == "__main__"`, start Uvicorn with one worker
+
+## Not allowed here
+
+Route handlers, status transitions, SQL, Slack HTTP, callback retries, and hand-built error JSON. Those belong in the slice that owns them.
+
+`main.py` stays within 80 lines. Bootstrap mounts the routers. `main.py` does not call `include_router` once per router. A package `__init__.py` does not re-export `router`.
+
+The process runs one worker. Bootstrap does not start a second scan or a second callback runner.

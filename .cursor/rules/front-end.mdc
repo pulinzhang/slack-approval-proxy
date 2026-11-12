@@ -1,0 +1,26 @@
+---
+description: Control-tower console. Same static module shape as a small hash SPA, limited to read-only trace screens.
+globs: static/**
+alwaysApply: false
+---
+
+# Control tower frontend
+
+Screens and routes are `doc/integration_control_tower_frontend.md`. Read-only behavior is §8 of `doc/slack_approval_proxy_mvp_technical_design_document.md`.
+
+## Shell
+
+- `static/index.html` is served at `GET /`. Assets are mounted at `/static`.
+- Hash routes: `#/overview`, `#/exchanges`, `#/exchange?exchange_id=`, `#/map`, `#/audit?request_id=`.
+- `static/js` root holds only `main.js` and `app.js`. Each screen is `features/<page>/template.js` plus `index.js`. `pageMeta` lives in `features/index.js`.
+- A new menu screen updates `pageMeta`, `app.js`, and a sidebar `data-page`. Inspector stays off the menu.
+- State stays inside the page module. `render` then `init`.
+- User-visible API text goes through `esc`. Bump `?v=` when a script changes.
+
+## Data
+
+- Calls are only `GET /api/v1/message-exchanges`, `GET /api/v1/message-exchanges/summary`, `GET /api/v1/message-exchanges/{exchange_id}`, and `GET /api/v1/approvals/{request_id}/trace`.
+- `HttpClient` sends `X-API-Key` from `sessionStorage` key `integration_hub_api_key` and returns the JSON body unchanged.
+- Show `http_status` and `business_outcome` together. `sent` and `timeout` keep an empty response.
+- A `503` stays an error. It is not drawn as an empty list or an empty chain.
+- Do not add a control that creates, edits, or deletes a row.
