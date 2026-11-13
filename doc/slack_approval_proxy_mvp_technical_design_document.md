@@ -71,54 +71,46 @@ Delivery order for implementation:
 
 The proxy commits a `posting` row before it calls Slack. `pending` means the channel id and message `ts` are already stored.
 
-```text
-+------------------------+             +----------------------------------+             +-----------------+
-| External business system|             |   FastAPI Approval Proxy         |             |   Slack         |
-| (ERP / CRM / HR)       |             |   (FastAPI + SQLite)             |             |   (Slack API)   |
-+-----------+------------+             +----------------+-----------------+             +--------+--------+
-            |                                           |                                        |
-            |  1. POST /api/v1/approvals (X-API-Key)    |                                        |
-            |------------------------------------------>|                                        |
-            |                                           |  2. Insert status='posting'            |
-            |                                           |=======> [ SQLite: approvals.db ]       |
-            |                                           |  3. POST chat.postMessage              |
-            |                                           |--------------------------------------->|
-            |                                           |  4. Store ts, set status='pending'     |
-            |                                           |=======> [ SQLite: approvals.db ]       |
-            |  5. 200 result=created                    |                                        |
-            |<------------------------------------------|                                        |
-            |                                           |                                        |
-            |                                           |        6. Click Approve / Reject       |
-            |                                           |<---------------------------------------|
-            |                                           |  POST /api/v1/slack/interactive        |
-            |                                           |                                        |
-            |                                           |  7. Conditional status update          |
-            |                                           |=======> [ SQLite: approvals.db ]       |
-            |                                           |  8. chat.update (remove buttons)       |
-            |                                           |--------------------------------------->|
-            |  9. Callback runner (retry 2s / 5s / 10s) |                                        |
-            |<------------------------------------------|                                        |
+```mermaid
+sequenceDiagram
+  participant Ext as External business system
+  participant Proxy as FastAPI Approval Proxy
+  participant DB as SQLite approvals.db
+  participant Slack as Slack
+  Ext->>Proxy: 1. POST /api/v1/approvals (X-API-Key)
+  Proxy->>DB: 2. Insert status=posting
+  Proxy->>Slack: 3. POST chat.postMessage
+  Proxy->>DB: 4. Store ts, set status=pending
+  Proxy-->>Ext: 5. 200 result=created
+  Slack->>Proxy: 6. Click Approve / Reject, POST /api/v1/slack/interactive
+  Proxy->>DB: 7. Conditional status update
+  Proxy->>Slack: 8. chat.update (remove buttons)
+  Proxy-->>Ext: 9. Callback runner (retry 2s / 5s / 10s)
 ```
 
 A definite Slack `ok: false` sets the row to `failed` and step 5 becomes `502`. A timeout or a dropped connection leaves the row at `posting` and step 5 becomes `502` with an unknown-outcome message. The caller retries the same `POST`.
 
 ### 2.2 End-to-End Sequence
 
-```text
-[External System]          [FastAPI Proxy]          [SQLite DB]          [Slack App / API]          [Approver]
-       │                          │                      │                       │                        │
-       │─── 1. Create Request ───>│                      │                       │                        │
-       │                          │─── 2. Insert posting >│                       │                        │
-       │                          │─── 3. Post Card ────────────────────────────>│                        │
-       │                          │─── 4. Save ts, pending>│                      │                        │
-       │<── 5. 200 created ───────│                      │                       │─── 6. Render Card ────>│
-       │                          │                      │                       │                        │
-       │                          │                      │                       │<── 7. Click Button ────│
-       │                          │<───────────────────── 8. Interactive callback ───────────────────────│
-       │                          │─── 9. UPDATE if still open ─>│               │                        │
-       │                          │─── 10. Replace card ────────────────────────>│                        │
-       │<── 11. Webhook (async) ──│                      │                       │                        │
-       │                          │─── 12. 200 empty ────────────────────────────────────────────────────>│
+```mermaid
+sequenceDiagram
+  participant Ext as External System
+  participant Proxy as FastAPI Proxy
+  participant DB as SQLite DB
+  participant Slack as Slack App / API
+  participant Approver as Approver
+  Ext->>Proxy: 1. Create Request
+  Proxy->>DB: 2. Insert posting
+  Proxy->>Slack: 3. Post Card
+  Proxy->>DB: 4. Save ts, pending
+  Proxy-->>Ext: 5. 200 created
+  Slack->>Approver: 6. Render Card
+  Approver->>Slack: 7. Click Button
+  Slack->>Proxy: 8. Interactive callback
+  Proxy->>DB: 9. UPDATE if still open
+  Proxy->>Slack: 10. Replace card
+  Proxy--)Ext: 11. Webhook (async)
+  Proxy-->>Slack: 12. 200 empty
 ```
 
 Step 11 starts after the winning update and does not delay step 10 or step 12. Only the database update that changed the row schedules a webhook.
